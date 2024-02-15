@@ -2,6 +2,17 @@ import cv2
 import depthai as dai
 import numpy as np
 import time
+import sys
+import os
+# Get the directory of the current file
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# Append the subdirectory to the current directory
+parent_dir = os.path.dirname(current_dir)
+# Add the subdirectory to the system path
+sys.path.append(parent_dir)
+
+from ShapeDetector import depth_functions
+
 stepSize = 0.05
 
 newConfig = False
@@ -59,7 +70,7 @@ xinSpatialCalcConfig.out.link(spatialLocationCalculator.inputConfig)
 # Connect to device and start pipeline
 with dai.Device(pipeline) as device:
     try:        
-        device.setIrLaserDotProjectorBrightness(1200) # in mA, 0..1200
+        device.setIrLaserDotProjectorBrightness(750) # in mA, 0..1200 over 750 saturates (Docs)
         device.setIrFloodLightBrightness(0)
         
     except Exception as e:
@@ -91,21 +102,22 @@ with dai.Device(pipeline) as device:
 
         spatialData = spatialCalcQueue.get().getSpatialLocations()
         for depthData in spatialData:
-            roi = depthData.config.roi
-            roi = roi.denormalize(width=depthFrameColor.shape[1], height=depthFrameColor.shape[0])
-            xmin = int(roi.topLeft().x)
-            ymin = int(roi.topLeft().y)
-            xmax = int(roi.bottomRight().x)
-            ymax = int(roi.bottomRight().y)
+            depth_functions.paintSpatialData(depthData, depthFrameColor)
+            # roi = depthData.config.roi
+            # roi = roi.denormalize(width=depthFrameColor.shape[1], height=depthFrameColor.shape[0])
+            # xmin = int(roi.topLeft().x)
+            # ymin = int(roi.topLeft().y)
+            # xmax = int(roi.bottomRight().x)
+            # ymax = int(roi.bottomRight().y)
 
-            depthMin = depthData.depthMin
-            depthMax = depthData.depthMax
+            # depthMin = depthData.depthMin
+            # depthMax = depthData.depthMax
 
-            fontType = cv2.FONT_HERSHEY_TRIPLEX
-            cv2.rectangle(depthFrameColor, (xmin, ymin), (xmax, ymax), color, 1)
-            cv2.putText(depthFrameColor, f"X: {int(depthData.spatialCoordinates.x)} mm", (xmin + 10, ymin + 20), fontType, 0.5, color)
-            cv2.putText(depthFrameColor, f"Y: {int(depthData.spatialCoordinates.y)} mm", (xmin + 10, ymin + 35), fontType, 0.5, color)
-            cv2.putText(depthFrameColor, f"Z: {int(depthData.spatialCoordinates.z)} mm", (xmin + 10, ymin + 50), fontType, 0.5, color)
+            # fontType = cv2.FONT_HERSHEY_TRIPLEX
+            # cv2.rectangle(depthFrameColor, (xmin, ymin), (xmax, ymax), color, 1)
+            # cv2.putText(depthFrameColor, f"X: {int(depthData.spatialCoordinates.x)} mm", (xmin + 10, ymin + 20), fontType, 0.5, color)
+            # cv2.putText(depthFrameColor, f"Y: {int(depthData.spatialCoordinates.y)} mm", (xmin + 10, ymin + 35), fontType, 0.5, color)
+            # cv2.putText(depthFrameColor, f"Z: {int(depthData.spatialCoordinates.z)} mm", (xmin + 10, ymin + 50), fontType, 0.5, color)
         # Show the frame
         cv2.imshow("depth", depthFrameColor)
 

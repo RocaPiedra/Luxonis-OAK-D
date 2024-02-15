@@ -6,6 +6,18 @@ from aux_functions import *
 from TestImages.image_searcher import *
 import time
 
+def ConcatenateImages(images, target_res):
+    images3D = []
+    if len(images) == 2:
+        target_res = (target_res[0],(int)(target_res[1]/2))
+    for image in images:
+        if image.ndim == 2:
+            images3D.append(cv2.merge((image, image, image)))
+        else:
+            images3D.append(image)            
+    combined_image = np.hstack(images3D)
+    return (cv2.resize(combined_image, target_res))
+
 def Preproc4ShapeDetection(img, show_images = True):
     assert img is not None
     
@@ -62,7 +74,6 @@ def readWebcam(deviceCapture = 0, frameWidth = 640, frameHeight = 480):
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break    
             
-            
 def createWindowTrackbar(_Calibrator):    
     cv2.namedWindow("TrackBars")
     cv2.resizeWindow("TrackBars",640,240)
@@ -75,7 +86,6 @@ def createWindowTrackbar(_Calibrator):
                        _Calibrator.high_max,
                        _Calibrator.HighChange)
     
-
 def CannyListProcessor(images, change_time = 10):
     
     cannyCalibrator = Calibrator(200,300,400,0,500,200)
