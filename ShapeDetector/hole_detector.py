@@ -14,8 +14,8 @@ class Resolution:
 # default values for canny algorithm with good results
 @dataclass
 class CannyCalibration:
-    low: int = 25
-    high: int = 241
+    low: int = 100 # in Sg # 25 # in office
+    high: int = 450 # in Sg # 241 # in office
     
 class HoleDetector():        
     
@@ -35,7 +35,9 @@ class HoleDetector():
         self.prepareRGBPipeline(rgb_res, rgb_preview_res)
         self.prepareSpatialLocationCalculator(depth_res)
         
-        self.shape_detector = ShapeDetector()
+        # area sizes should be based on image resolution
+        # 1000 - 3000 for 12MP at around 400 to 500 mm of distance
+        self.shape_detector = ShapeDetector(1000, 3000)
         
         self.kernel = np.ones((5,5),np.uint8)
         
@@ -181,7 +183,7 @@ class HoleDetector():
         newBottomRight = depthai.Point2f((adapted_x + new_ROI_width/2)/dAI_res.width, (adapted_y + new_ROI_height/2)/dAI_res.height)
         return  depthai.Rect(newTopLeft, newBottomRight)
     
-    def getShapes(self, preprocessed_img, rgb_img, target_shape = "hexagon", ratio = 1):    
+    def getShapes(self, preprocessed_img, rgb_img, target_shape = "hexagon", ratio = 1, only_closed_contours: bool = False):    
         if preprocessed_img is not None:
             cnts = cv2.findContours(preprocessed_img.copy(), cv2.RETR_EXTERNAL,
                 cv2.CHAIN_APPROX_SIMPLE)	
@@ -191,7 +193,7 @@ class HoleDetector():
             for c in cnts:
                 if c is not None:
                     # shapeList stores all contours in a frame, the information is held in a list of DetectedShapeClass
-                    self.shapeList.append(self.shape_detector.get_contour(c, ratio, rgb_img, target_shape))           
+                    self.shapeList.append(self.shape_detector.get_contour(c, ratio, rgb_img, target_shape, only_closed_contours=only_closed_contours))           
             
             return rgb_img # return the original image with the overlayed detection
 

@@ -5,39 +5,75 @@ import math
 from aux_functions import VariableStringBuilder
 
 class ShapeDetector:
-	def __init__(self):
-		pass
-	def detect(self, contour, target_shape = None):
+	def __init__(self, min_area, max_area):
+		self.min_area = min_area
+		self.max_area = max_area
+	def detect(self, contour, target_shape = None, only_closed_contours: bool = False):
 		# initialize the shape name and approximate the contour
-		
+		closed_contour = True
+		area = cv2.contourArea(contour) 
 		perimeter = cv2.arcLength(contour, True)
+		if only_closed_contours:
+			closed_contour = self.verify_closed_contour(area, perimeter)
+			if closed_contour is False: return None
+			elif not self.verify_area(area, self.min_area, self.max_area): return None
 		contour_approximation = cv2.approxPolyDP(contour, 0.04 * perimeter, True) # format?
 		shape = ShapeDetector.return_shape_name(len(contour_approximation))
 		if shape != "unidentified":
 			if target_shape is None:
-				return DetectedShapeClass(contour, contour_approximation, shape, None, is_target=True)
+				return DetectedShapeClass(
+					contour, contour_approximation, shape, None, is_target=True, is_closed=closed_contour)
 			else:
-				if shape == target_shape:
-					return DetectedShapeClass(contour, contour_approximation, shape, None, is_target=True)
-				else:
-					return DetectedShapeClass(contour, contour_approximation, shape, None, is_target=False)
+				return DetectedShapeClass(
+					contour, contour_approximation, shape, None, is_target=(shape==target_shape), is_closed=closed_contour)
 
-	def get_contour(self, c, ratio, image, target_shape = None, paint_image: bool = True):
+	def get_contour(self, c, ratio, image, target_shape = None, paint_image: bool = True, only_closed_contours: bool = False):
 		M = cv2.moments(c)		
 		try:
 			if  M["m00"] == 0:
 				raise Exception("Zero Moments, contour is not correct")
 			cX = int((M["m10"] / M["m00"]) * ratio)
 			cY = int((M["m01"] / M["m00"]) * ratio)
-			ShapeClass = self.detect(c, target_shape)
-			ShapeClass.correct_location((cX, cY))
+			ShapeClass = self.detect(c, target_shape,only_closed_contours)
 			if ShapeClass is not None:
+				ShapeClass.correct_location((cX, cY))
 				if paint_image:
 					ShapeClass.paintShape(image, ratio)
 				return ShapeClass
 		except Exception as e:
 			print("Error [get_contour]: " + str(e))
    	
+	@staticmethod
+	def verify_closed_contour(area, perimeter):
+		# if the contour is open the area should be zero:
+		if area > perimeter:
+			return True
+		else:
+			return False
+		
+	@staticmethod
+	def verify_min_area(area, min_area):
+		# if the contour is open the area should be zero:
+		if area > min_area:
+			return True
+		else:
+			return False
+	@staticmethod
+	def verify_max_area(area, max_area):
+		# if the contour is open the area should be zero:
+		if area < max_area:
+			return True
+		else:
+			return False
+	@staticmethod
+	def verify_area(area, min_area, max_area):
+		# if the contour is open the area should be zero:
+		if ShapeDetector.verify_min_area(area, min_area) and ShapeDetector.verify_max_area(area, max_area):
+			return True
+		else:
+			return False
+
+	@staticmethod
 	def return_shape_name(vertex_count: int):
 		match vertex_count:
 			case vertex_count if vertex_count < 3:
@@ -70,12 +106,13 @@ class ShapeDetector:
 		return shape
 
 class DetectedShapeClass:    
-	def __init__(self, contour, poligon_approximation, shape_name, centroid_location, is_target = False):
+	def __init__(self, contour, poligon_approximation, shape_name, centroid_location, is_target = False, is_closed = True):
 		self.contour = contour
 		self.poligon_approximation = poligon_approximation
 		self.shape_name = shape_name
 		self.centroid_location = centroid_location
 		self.is_target = is_target
+		self.is_closed = is_closed
 		self.ROI: depthai.Rect = None
 		self.setROI()
 
@@ -134,8 +171,12 @@ class DetectedShapeClass:
 		c = self.contour.astype("float")
 		c *= ratio
 		c = c.astype("int")
-		if self.is_target:
+		if self.is_target and self.is_closed:
 			shape_color = (0, 128, 0) #green
+			text_color = shape_color
+		elif self.is_closed == False:
+			return
+			shape_color = (255, 255, 255) #white
 			text_color = shape_color
 		else:
 			shape_color = (0, 0, 255) #red
