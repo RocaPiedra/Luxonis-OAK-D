@@ -6,17 +6,68 @@ from aux_functions import *
 from TestImages.image_searcher import *
 import time
 
-def ConcatenateImages(images, target_res):
-    images3D = []
-    if len(images) == 2:
-        target_res = (target_res[0],(int)(target_res[1]/2))
+def pad_image(image, target_width):
+    height, width = image.shape[:2]
+    padding = np.zeros((height, target_width - width, 3), dtype=np.uint8)
+    padded_image = np.hstack((image, padding))
+    return padded_image
+
+def stack_images(images, max_horizontal, full_window_resolution):
+    num_images = len(images)
+    rows = int(np.ceil(num_images / max_horizontal))
+    stacked_images = []    
+    prepared_images = []
+
+    target_width = full_window_resolution[0] // max_horizontal
+    target_height = full_window_resolution[1] // max_horizontal
+    target_resolution = (target_width, target_height)
+
+    while len(images) < max_horizontal * rows:
+        images.append(np.zeros(target_resolution, np.uint8))
+
     for image in images:
+        image = cv2.resize(image, target_resolution)
         if image.ndim == 2:
-            images3D.append(cv2.merge((image, image, image)))
+            prepared_images.append(cv2.merge((image, image, image)))
         else:
-            images3D.append(image)            
-    combined_image = np.hstack(images3D)
-    return (cv2.resize(combined_image, target_res))
+            prepared_images.append(image)
+
+    for i in range(rows):
+        row_images = prepared_images[i * max_horizontal: (i + 1) * max_horizontal]
+        padded_row_images = [pad_image(img, target_width) for img in row_images]
+        stacked_row = np.hstack(padded_row_images)
+        stacked_images.append(stacked_row)
+
+    final_image = np.vstack(stacked_images)
+
+    final_image = cv2.resize(final_image, full_window_resolution)
+
+    return final_image
+
+def ConcatenateImages(horizontal_images: [], vertical_images: [], visualization_res):
+    horiz_images = []
+    vert_images = []
+    frame_res = (visualization_res[0]/len(vertical_images),(int)(visualization_res[1]/len(horizontal_images)))
+    if len(horizontal_images) == 2:
+        visualization_res = (visualization_res[0],(int)(visualization_res[1]/2))
+    for image in horizontal_images:
+        if image.ndim == 2:
+            horiz_images.append(cv2.merge((image, image, image)))
+        else:
+            horiz_images.append(image) 
+    for image in vertical_images:
+        if image.ndim == 2:
+            vert_images.append(cv2.merge((image, image, image)))
+        else:
+            vert_images.append(image)
+
+    result = None
+    if len(horiz_images > 0): 
+        result = np.hstack(horiz_images)      
+    if len(vert_images > 0): 
+        if result is None:
+            combined_image = np.vstack(vert_images)
+    return (cv2.resize(combined_image, visualization_res))
 
 def Preproc4ShapeDetection(img, show_images = True):
     assert img is not None
@@ -74,14 +125,14 @@ def readWebcam(deviceCapture = 0, frameWidth = 640, frameHeight = 480):
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break    
             
-def createWindowTrackbar(_Calibrator):    
-    cv2.namedWindow("TrackBars")
-    cv2.resizeWindow("TrackBars",640,240)
-    cv2.createTrackbar("CannyLowThreshold","TrackBars",
+def createWindowTrackbar(_Calibrator: Calibrator, window_name: str = "TrackBars"):    
+    cv2.namedWindow(window_name)
+    cv2.resizeWindow(window_name,640,240)
+    cv2.createTrackbar("CannyLowThreshold",window_name,
                        _Calibrator.low_threshold,
                        _Calibrator.low_max,
                        _Calibrator.LowChange)    
-    cv2.createTrackbar("CannyHighThreshold","TrackBars",
+    cv2.createTrackbar("CannyHighThreshold",window_name,
                        _Calibrator.high_threshold,
                        _Calibrator.high_max,
                        _Calibrator.HighChange)

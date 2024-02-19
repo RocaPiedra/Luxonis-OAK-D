@@ -14,12 +14,14 @@ import random
 def main():    
     RGBRes = Resolution(1920,1080)
     DepthRes = Resolution(640,400)
-    VisRes = (1920,1080)
+    VisRes = (1920,1000)
     # 1280×720, 1280×800, 640×400, 640×480, 1920×1200
     cannyCalibrator = calibrator_class.Calibrator(CannyCalibration.low,CannyCalibration.high,400,0,500,200)
-    cv_functions.createWindowTrackbar(cannyCalibrator)
+    cv_functions.createWindowTrackbar(cannyCalibrator, "Detections")
     detector = HoleDetector(depthai.ColorCameraProperties.SensorResolution.THE_1080_P,RGBRes,
                             depthai.MonoCameraProperties.SensorResolution.THE_400_P)
+    
+    filter_open_contours = True
     
     with depthai.Device(detector.pipeline) as device:
         q_rgb = device.getOutputQueue("rgb", maxSize=1, blocking=False) # set the max size to stop processing old images
@@ -62,10 +64,10 @@ def main():
                                                     cannyCalibrator.high_threshold)
                     canny_scaled = cv2.resize(imgPreproc, VisRes)
                     # cv2.imshow("Canny", canny_scaled)
-                    imgShapes = detector.getShapes(imgPreproc, frame)
+                    imgShapes = detector.getShapes(imgPreproc, frame, only_closed_contours=filter_open_contours)
                     detection_scaled = cv2.resize(imgShapes, VisRes)
                     # cv2.imshow("Shapes", detection_scaled)
-                    concatenated = cv_functions.ConcatenateImages([canny_scaled, detection_scaled], VisRes)
+                    concatenated = cv_functions.stack_images([canny_scaled, detection_scaled], 2, VisRes)
                     cv2.imshow("Detections", concatenated)
                     for shape in detector.shapeList:
                         if shape is not None:                            
@@ -82,7 +84,9 @@ def main():
                                         spatialData = spatialCalcQueue.get().getSpatialLocations()
                                         for depthData in spatialData:
                                             depth_functions.paintSpatialData(depthData, depthFrameColor)
-                                            cv2.imshow("located shapes", depthFrameColor)
+                                            concatenated = cv_functions.stack_images([canny_scaled, detection_scaled, depthFrameColor], 2, VisRes)
+                                            cv2.imshow("Detections", concatenated)
+                                            # cv2.imshow("Detections", depthFrameColor)
             
               
             if cv2.waitKey(1) == ord('q'):
